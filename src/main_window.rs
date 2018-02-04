@@ -50,6 +50,14 @@ impl MainWindow {
             drawing_area.queue_draw();
         }));
 
+        let font_letter_spacing_button: SpinButton = builder.get_object("font_letter_spacing").expect("Couldn't get font letter spacing button");
+        font_letter_spacing_button.set_value(render_settings.borrow().letter_spacing as f64);
+        font_letter_spacing_button.connect_value_changed(clone!(drawing_area, render_settings => move |btn| {
+            let new_spacing = btn.get_value() as isize;
+            (*render_settings.borrow_mut()).letter_spacing = new_spacing;
+            drawing_area.queue_draw();
+        }));
+
         let border_color_button: ColorButton = builder.get_object("border_color").expect("Couldn't get border color button");
         border_color_button.set_rgba(&render_settings.borrow().border_color);
         ColorButtonExt::connect_property_rgba_notify(&border_color_button, clone!(drawing_area, render_settings => move |btn| {
@@ -68,10 +76,11 @@ impl MainWindow {
 
         drawing_area.connect_draw(clone!(drawing_area, render_settings => move |_, cr| {
             let render_settings = render_settings.borrow();
+            let letter_spacing = render_settings.letter_spacing as i32;
             let width = drawing_area.get_allocated_width();
             let height = drawing_area.get_allocated_height();
-            let mut left: f64 = 0.0;
-            let mut top: f64 = 0.0;
+            let mut left: i32 = letter_spacing;
+            let mut top: i32 = letter_spacing;
             let mut max_row_height: i32 = 0;
 
             let surface = cairo::ImageSurface::create(cairo::Format::ARgb32, width, height).unwrap();
@@ -84,8 +93,8 @@ impl MainWindow {
 
             for character in render_settings.text.chars() {
                 if character == '\n' {
-                    left = 0.0;
-                    top += max_row_height as f64;
+                    top += max_row_height + letter_spacing;
+                    left = letter_spacing;
                     max_row_height = 0;
                     continue
                 }
@@ -93,21 +102,31 @@ impl MainWindow {
                 let codepoint = character as usize;
                 let outline_glyph = RenderedGlyph::new_outline(&render_settings.library, &render_settings.face, codepoint, &render_settings.border_color, render_settings.border_width).unwrap();
                 let inside_glyph = RenderedGlyph::new(&render_settings.library, &render_settings.face, codepoint, &render_settings.font_color).unwrap();
-                let outline_left = outline_glyph.origin.0 as f64;
-                let outline_top = outline_glyph.origin.1 as f64;
-                let inside_left = inside_glyph.origin.0 as f64;
-                let inside_top = inside_glyph.origin.1 as f64;
+
+                let outline_top = outline_glyph.origin.1 + outline_glyph.surface.get_height();
+                let inside_top = inside_glyph.origin.1 + inside_glyph.surface.get_height();
+                let glyph_top = cmp::max(outline_top, inside_top);
+
+                let outline_left = outline_glyph.origin.0;
+                let inside_left = inside_glyph.origin.0;
+                let glyph_left = cmp::min(outline_left, inside_left);
+
+                let outline_right = cmp::max(0, outline_glyph.origin.0) + outline_glyph.surface.get_width();
+                let inside_right = cmp::max(0, inside_glyph.origin.0) + inside_glyph.surface.get_width();
+                let glyph_right = cmp::max(outline_right, inside_right);
+
+                let outline_bottom = cmp::max(outline_glyph.surface.get_height(), inside_glyph.surface.get_height());
 
                 context.set_operator(cairo::Operator::Over);
-                context.set_source_surface(&outline_glyph.surface, left + outline_left, top + outline_top);
+                context.set_source_surface(&outline_glyph.surface, (left - glyph_left + outline_left) as f64, (top + glyph_top - outline_top) as f64);
                 context.paint();
 
                 context.set_operator(cairo::Operator::Over);
-                context.set_source_surface(&inside_glyph.surface, left + inside_left, top + inside_top);
+                context.set_source_surface(&inside_glyph.surface, (left - glyph_left + inside_left) as f64, (top + glyph_top - inside_top) as f64);
                 context.paint();
 
-                left += outline_left + outline_glyph.surface.get_width() as f64;
-                max_row_height = cmp::max(max_row_height, outline_glyph.surface.get_height());
+                left += glyph_right + letter_spacing;
+                max_row_height = cmp::max(max_row_height, outline_bottom);
             }
 
             cr.set_operator(cairo::Operator::Over);

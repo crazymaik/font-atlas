@@ -8,6 +8,7 @@ pub struct RenderSettings {
     pub border_width: isize,
     pub font_color: RGBA,
     pub font_size: isize,
+    pub letter_spacing: isize,
     pub text: String,
 }
 
@@ -24,6 +25,7 @@ impl RenderSettings {
             border_width: 4,
             font_color: RGBA::white(),
             font_size: default_font_size,
+            letter_spacing: 2,
             text: String::from("AaBbCcDd"),
         }
     }
