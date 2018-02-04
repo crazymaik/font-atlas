@@ -41,10 +41,7 @@ impl RenderedGlyph {
         unsafe {
             let p: *const fts::FT_GlyphRec = glyph.raw() as *const fts::FT_GlyphRec;
             let mut gp: fts::FT_Glyph = mem::transmute_copy(&p);
-            let err = fts::FT_Glyph_StrokeBorder(&mut gp, stroker, false as fts::FT_Bool, false as fts::FT_Bool);
-
-            println!("Error {}", err);
-
+            fts::FT_Glyph_StrokeBorder(&mut gp, stroker, false as fts::FT_Bool, false as fts::FT_Bool);
             glyph = ft::Glyph::from_raw(library.raw(), gp);
         }
 
