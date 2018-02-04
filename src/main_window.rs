@@ -1,5 +1,5 @@
 use cairo;
-use gtk::{self, Builder, DrawingArea, SpinButton, Window};
+use gtk::{self, Builder, ColorButton, DrawingArea, SpinButton, Window};
 use gtk::prelude::*;
 use std::cell::RefCell;
 use std::path::{Path};
@@ -19,19 +19,37 @@ impl MainWindow {
         let window: Window = builder.get_object("main_window").expect("Couldn't get main window");
         let drawing_area: DrawingArea = builder.get_object("drawing_area").expect("Couldn't get drawing area");
         let font_size_spin_button: SpinButton = builder.get_object("font_size").expect("Couldn't get font size spin button");
+        let font_color_button: ColorButton = builder.get_object("font_color").expect("Couldn't get font color button");
         let border_width_spin_button: SpinButton = builder.get_object("border_width").expect("Couldn't get border width spin button");
+        let border_color_button: ColorButton = builder.get_object("border_color").expect("Couldn't get border color button");
 
         window.connect_delete_event(|_,_| {
             gtk::main_quit();
             Inhibit(false)
         });
 
-        font_size_spin_button.set_value(render_settings.borrow().char_size as f64);
+        font_color_button.set_rgba(&render_settings.borrow().font_color);
+
+        ColorButtonExt::connect_property_rgba_notify(&font_color_button, clone!(drawing_area, render_settings => move |btn| {
+            let new_color = btn.get_rgba();
+            (*render_settings.borrow_mut()).font_color = new_color;
+            drawing_area.queue_draw();
+        }));
+
+        font_size_spin_button.set_value(render_settings.borrow().font_size as f64);
 
         font_size_spin_button.connect_value_changed(clone!(drawing_area, render_settings => move |btn| {
             let new_size = btn.get_value() as isize;
-            (*render_settings.borrow_mut()).char_size = new_size;
+            (*render_settings.borrow_mut()).font_size = new_size;
             (*render_settings.borrow()).face.set_char_size(0, new_size * 64, 0, 64).unwrap();
+            drawing_area.queue_draw();
+        }));
+
+        border_color_button.set_rgba(&render_settings.borrow().border_color);
+
+        ColorButtonExt::connect_property_rgba_notify(&border_color_button, clone!(drawing_area, render_settings => move |btn| {
+            let new_color = btn.get_rgba();
+            (*render_settings.borrow_mut()).border_color = new_color;
             drawing_area.queue_draw();
         }));
 
@@ -50,8 +68,8 @@ impl MainWindow {
             let character = 65;
             let left = 50.0;
             let top = 20.0;
-            let outline_glyph = RenderedGlyph::new_outline(&render_settings.library, &render_settings.face, character, (0, 0, 0), render_settings.border_width).unwrap();
-            let inside_glyph = RenderedGlyph::new(&render_settings.library, &render_settings.face, character, (255, 255, 0)).unwrap();
+            let outline_glyph = RenderedGlyph::new_outline(&render_settings.library, &render_settings.face, character, &render_settings.border_color, render_settings.border_width).unwrap();
+            let inside_glyph = RenderedGlyph::new(&render_settings.library, &render_settings.face, character, &render_settings.font_color).unwrap();
             let outline_left = outline_glyph.origin.0 as f64;
             let outline_top = outline_glyph.origin.1 as f64;
             let inside_left = inside_glyph.origin.0 as f64;

@@ -1,12 +1,13 @@
 extern crate cairo;
 extern crate freetype as ft;
+extern crate gdk;
 extern crate gtk;
 
 #[macro_use]
 mod macros;
+mod main_window;
 mod rendered_glyph;
 mod render_settings;
-mod main_window;
 
 use std::cell::RefCell;
 use std::rc::Rc;

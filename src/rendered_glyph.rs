@@ -1,6 +1,7 @@
 use cairo;
 use ft;
 use ft::freetype_sys as fts;
+use gdk::{RGBA};
 use std::ptr;
 use std::mem;
 
@@ -10,7 +11,7 @@ pub struct RenderedGlyph {
 }
 
 impl RenderedGlyph {
-    pub fn new(_library: &ft::Library, face: &ft::Face, character: usize, color: (u8, u8, u8)) -> ft::FtResult<RenderedGlyph> {
+    pub fn new(_library: &ft::Library, face: &ft::Face, character: usize, color: &RGBA) -> ft::FtResult<RenderedGlyph> {
         face.load_char(character, ft::face::LoadFlag::DEFAULT)?;
 
         let glyph = face.glyph().get_glyph()?;
@@ -25,7 +26,7 @@ impl RenderedGlyph {
         })
     }
     
-    pub fn new_outline(library: &ft::Library, face: &ft::Face, character: usize, color: (u8, u8, u8), border_width: isize) -> ft::FtResult<RenderedGlyph> {
+    pub fn new_outline(library: &ft::Library, face: &ft::Face, character: usize, color: &RGBA, border_width: isize) -> ft::FtResult<RenderedGlyph> {
 
         let mut stroker: ft::freetype_sys::FT_Stroker = ptr::null_mut();
         unsafe {
@@ -58,22 +59,25 @@ impl RenderedGlyph {
         })
     }
 
-    pub fn bitmap_glyph_to_surface(glyph: ft::BitmapGlyph, color: (u8, u8, u8)) -> ft::FtResult<cairo::ImageSurface> {
+    pub fn bitmap_glyph_to_surface(glyph: ft::BitmapGlyph, color: &RGBA) -> ft::FtResult<cairo::ImageSurface> {
         let bitmap = glyph.bitmap();
         let width = bitmap.width() as usize;
         let height = bitmap.rows() as usize;
         let stride = cairo::Format::ARgb32.stride_for_width(bitmap.width() as u32).unwrap_or(width as i32 * 4) as usize;
         let out_size = stride * bitmap.rows() as usize;
         let mut out: Vec<u8> = Vec::with_capacity(out_size);
+        let red = (color.red * 255.0) as u8;
+        let green = (color.green * 255.0) as u8;
+        let blue = (color.blue * 255.0) as u8;
 
         for y in 0..height {
             for x in 0..width {
                 let value = bitmap.buffer()[y * width + x];
 
                 if value > 0 {
-                    out.push(color.0);
-                    out.push(color.1);
-                    out.push(color.2);
+                    out.push(blue);
+                    out.push(green);
+                    out.push(red);
                 } else {
                     out.push(0);
                     out.push(0);

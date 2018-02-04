@@ -6,6 +6,7 @@ authors = ["Michael Zoech <michi.zoech@gmail.com>"]
 [dependencies]
 cairo-rs = "0.3"
 freetype-rs = "0.16"
+gdk = "0.7"
 
 [dependencies.gtk]
 version = "0.3"
