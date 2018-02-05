@@ -1,4 +1,4 @@
-use cairo;
+use cairo::{self, Pattern};
 use gtk::{self, AboutDialog, ApplicationWindow, Builder, ColorButton, DrawingArea, FileChooserAction, FileChooserDialog, FontButton, ImageMenuItem, ResponseType, SpinButton, TextView};
 use gtk::prelude::*;
 use std::cell::RefCell;
@@ -117,17 +117,40 @@ impl MainWindow {
         }));
 
         drawing_area.connect_draw(clone!(drawing_area, render_settings => move |_, cr| {
-            let render_settings = render_settings.borrow();
             let width = drawing_area.get_allocated_width();
             let height = drawing_area.get_allocated_height();
 
-            let glyphs = Glyphs::new();
+            {
+                let background_surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 32, 32).unwrap();
+                let background_context = cairo::Context::new(&background_surface);
 
-            let surface = glyphs.render_to_surface(&render_settings, width, height);
+                background_context.set_source_rgb(0.95, 0.95, 0.95);
+                background_context.set_operator(cairo::Operator::Source);
+                background_context.rectangle(0.0, 0.0, 16.0, 16.0);
+                background_context.rectangle(16.0, 16.0, 16.0, 16.0);
+                background_context.fill();
+                background_context.set_source_rgb(0.75, 0.75, 0.75);
+                background_context.rectangle(16.0, 0.0, 16.0, 16.0);
+                background_context.rectangle(0.0, 16.0, 16.0, 16.0);
+                background_context.fill();
 
-            cr.set_operator(cairo::Operator::Over);
-            cr.set_source_surface(&surface, 0.0, 0.0);
-            cr.paint();
+                let pattern = cairo::SurfacePattern::create(&background_surface);
+                pattern.set_extend(cairo::Extend::Repeat);
+                cr.set_operator(cairo::Operator::Source);
+                cr.set_source(&pattern);
+                cr.rectangle(0.0, 0.0, width as f64, height as f64);
+                cr.fill();
+            }
+
+            {
+                let render_settings = render_settings.borrow();
+                let glyphs = Glyphs::new();
+                let surface = glyphs.render_to_surface(&render_settings, width, height);
+
+                cr.set_operator(cairo::Operator::Over);
+                cr.set_source_surface(&surface, 0.0, 0.0);
+                cr.paint();
+            }
 
             Inhibit(false)
         }));
