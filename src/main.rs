@@ -3,6 +3,7 @@ extern crate freetype as ft;
 extern crate gdk;
 extern crate gtk;
 
+mod glyphs;
 #[macro_use]
 mod macros;
 mod main_window;

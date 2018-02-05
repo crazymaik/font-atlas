@@ -1,5 +1,6 @@
 use ft;
 use gdk::{RGBA};
+use std::default::Default;
 
 pub struct RenderSettings {
     pub library: ft::Library,
@@ -28,5 +29,15 @@ impl RenderSettings {
             letter_spacing: 2,
             text: String::from("AaBbCcDd"),
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.border_color = RGBA::black();
+        self.border_width = 4;
+        self.font_color = RGBA::white();
+        self.font_size = 128;
+        self.face.set_char_size(0, self.font_size*64, 0, 64).unwrap();
+        self.letter_spacing = 2;
+        self.text = String::from("AaBbCcDd");
     }
 }

@@ -1,29 +1,71 @@
 use cairo;
-use gtk::{self, Builder, ColorButton, DrawingArea, FontButton, SpinButton, TextView, Window};
+use gtk::{self, AboutDialog, ApplicationWindow, Builder, ColorButton, DrawingArea, FileChooserAction, FileChooserDialog, FontButton, ImageMenuItem, ResponseType, SpinButton, TextView};
 use gtk::prelude::*;
 use std::cell::RefCell;
-use std::cmp;
+use std::option::{Option};
 use std::path::{Path};
 use std::rc::Rc;
 
-use rendered_glyph::{RenderedGlyph};
+use glyphs::{Glyphs};
 use render_settings::{RenderSettings};
 
 pub struct MainWindow {
-    window: Window,
+    window: ApplicationWindow,
 }
 
 impl MainWindow {
 
     pub fn new_from_file<P: AsRef<Path>>(file_path: P, render_settings: Rc<RefCell<RenderSettings>>) -> MainWindow {
         let builder = Builder::new_from_file(file_path);
-        let window: Window = builder.get_object("main_window").expect("Couldn't get main window");
+        let window: ApplicationWindow = builder.get_object("main_window").expect("Couldn't get main window");
         let drawing_area: DrawingArea = builder.get_object("drawing_area").expect("Couldn't get drawing area");
 
         window.connect_delete_event(|_,_| {
             gtk::main_quit();
             Inhibit(false)
         });
+
+        let new_menu_item: ImageMenuItem = builder.get_object("new_action").expect("Couldn't get new menu item");
+        new_menu_item.connect_activate(clone!(drawing_area, render_settings => move |_| {
+            (*render_settings.borrow_mut()).reset();
+            drawing_area.queue_draw();
+        }));
+
+        let save_as_menu_item: ImageMenuItem = builder.get_object("save_as_action").expect("Couldn't get save as menu item");
+        save_as_menu_item.connect_activate(clone!(drawing_area, render_settings, window => move |_| {
+            let file_chooser = FileChooserDialog::new(Some("Save as..."), Some(&window), FileChooserAction::Save);
+            file_chooser.add_buttons(&[
+                ("Save", ResponseType::Ok.into()),
+                ("Cancel", ResponseType::Cancel.into())
+            ]);
+            if file_chooser.run() == ResponseType::Ok.into() {
+                let filename = file_chooser.get_filename().expect("Couldn't get filename");
+                let png_filepath = filename.with_extension("png");
+                let render_settings = render_settings.borrow();
+                let width = drawing_area.get_allocated_width();
+                let height = drawing_area.get_allocated_height();
+                let glyphs = Glyphs::new();
+                glyphs.write_to_file(png_filepath, &render_settings, width, height).expect("Succeeds");
+            }
+            file_chooser.destroy();
+        }));
+
+        let quit_menu_item: ImageMenuItem = builder.get_object("quit_action").expect("Couldn't get quit menu item");
+        quit_menu_item.connect_activate(clone!(window => move |_| {
+            window.close();
+        }));
+
+        let about_menu_item: ImageMenuItem = builder.get_object("about").expect("Couldn't get about menu item");
+        about_menu_item.connect_activate(clone!(window => move |_| {
+            let d = AboutDialog::new();
+            d.set_title("About");
+            d.set_authors(&["Michael Zoech"]);
+            d.set_program_name("font-atlas");
+            d.set_website(Some("https://github.com/crazymaik/font-atlas"));
+            d.set_transient_for(Some(&window));
+            d.run();
+            d.destroy();
+        }));
 
         let text_field: TextView = builder.get_object("text").expect("Couldn't get text field");
         text_field.get_buffer().expect("No text buffer").set_text(&render_settings.borrow().text);
@@ -76,58 +118,12 @@ impl MainWindow {
 
         drawing_area.connect_draw(clone!(drawing_area, render_settings => move |_, cr| {
             let render_settings = render_settings.borrow();
-            let letter_spacing = render_settings.letter_spacing as i32;
             let width = drawing_area.get_allocated_width();
             let height = drawing_area.get_allocated_height();
-            let mut left: i32 = letter_spacing;
-            let mut top: i32 = letter_spacing;
-            let mut max_row_height: i32 = 0;
 
-            let surface = cairo::ImageSurface::create(cairo::Format::ARgb32, width, height).unwrap();
-            let context = cairo::Context::new(&surface);
+            let glyphs = Glyphs::new();
 
-            context.set_source_rgba(0.0, 0.0, 0.0, 0.0);
-            context.set_operator(cairo::Operator::Source);
-            context.rectangle(0.0, 0.0, width as f64, height as f64);
-            context.fill();
-
-            for character in render_settings.text.chars() {
-                if character == '\n' {
-                    top += max_row_height + letter_spacing;
-                    left = letter_spacing;
-                    max_row_height = 0;
-                    continue
-                }
-
-                let codepoint = character as usize;
-                let outline_glyph = RenderedGlyph::new_outline(&render_settings.library, &render_settings.face, codepoint, &render_settings.border_color, render_settings.border_width).unwrap();
-                let inside_glyph = RenderedGlyph::new(&render_settings.library, &render_settings.face, codepoint, &render_settings.font_color).unwrap();
-
-                let outline_top = outline_glyph.origin.1 + outline_glyph.surface.get_height();
-                let inside_top = inside_glyph.origin.1 + inside_glyph.surface.get_height();
-                let glyph_top = cmp::max(outline_top, inside_top);
-
-                let outline_left = outline_glyph.origin.0;
-                let inside_left = inside_glyph.origin.0;
-                let glyph_left = cmp::min(outline_left, inside_left);
-
-                let outline_right = cmp::max(0, outline_glyph.origin.0) + outline_glyph.surface.get_width();
-                let inside_right = cmp::max(0, inside_glyph.origin.0) + inside_glyph.surface.get_width();
-                let glyph_right = cmp::max(outline_right, inside_right);
-
-                let outline_bottom = cmp::max(outline_glyph.surface.get_height(), inside_glyph.surface.get_height());
-
-                context.set_operator(cairo::Operator::Over);
-                context.set_source_surface(&outline_glyph.surface, (left - glyph_left + outline_left) as f64, (top + glyph_top - outline_top) as f64);
-                context.paint();
-
-                context.set_operator(cairo::Operator::Over);
-                context.set_source_surface(&inside_glyph.surface, (left - glyph_left + inside_left) as f64, (top + glyph_top - inside_top) as f64);
-                context.paint();
-
-                left += glyph_right + letter_spacing;
-                max_row_height = cmp::max(max_row_height, outline_bottom);
-            }
+            let surface = glyphs.render_to_surface(&render_settings, width, height);
 
             cr.set_operator(cairo::Operator::Over);
             cr.set_source_surface(&surface, 0.0, 0.0);
