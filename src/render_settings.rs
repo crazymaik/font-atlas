@@ -1,10 +1,10 @@
 use ft;
 use gdk::{RGBA};
-use std::default::Default;
+use std::rc::{Rc};
 
 pub struct RenderSettings {
-    pub library: ft::Library,
-    pub face: ft::Face<'static>,
+    pub library: Rc<ft::Library>,
+    pub face: Rc<ft::Face<'static>>,
     pub border_color: RGBA,
     pub border_width: isize,
     pub font_color: RGBA,
@@ -14,14 +14,14 @@ pub struct RenderSettings {
 }
 
 impl RenderSettings {
-    pub fn new(library: ft::Library, face: ft::Face<'static>) -> RenderSettings {
+    pub fn new(library: &Rc<ft::Library>, face: &Rc<ft::Face<'static>>) -> RenderSettings {
         let default_font_size = 128;
 
         face.set_char_size(0, default_font_size*64, 0, 64).unwrap();
 
         RenderSettings {
-            library: library,
-            face: face,
+            library: library.clone(),
+            face: face.clone(),
             border_color: RGBA::black(),
             border_width: 4,
             font_color: RGBA::white(),

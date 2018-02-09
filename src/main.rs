@@ -3,11 +3,11 @@ extern crate freetype as ft;
 extern crate gdk;
 extern crate gtk;
 
+mod glyph;
 mod glyphs;
 #[macro_use]
 mod macros;
 mod main_window;
-mod rendered_glyph;
 mod render_settings;
 
 use std::cell::RefCell;
@@ -21,9 +21,9 @@ fn main() {
         return;
     }
 
-    let library = ft::Library::init().unwrap();
-    let face: ft::Face = library.new_face("content/vt323-regular.ttf", 0).unwrap();
-    let render_settings = Rc::new(RefCell::new(RenderSettings::new(library, face)));
+    let library = Rc::new(ft::Library::init().unwrap());
+    let face = Rc::new(library.new_face("content/vt323-regular.ttf", 0).unwrap());
+    let render_settings = Rc::new(RefCell::new(RenderSettings::new(&library, &face)));
 
     let main_window = MainWindow::new_from_file("content/main.glade", render_settings.clone());
     main_window.show();

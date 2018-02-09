@@ -4,8 +4,8 @@ use std::fs::{File};
 use std::io;
 use std::path::{Path};
 
+use glyph::{Renderer};
 use render_settings::{RenderSettings};
-use rendered_glyph::{RenderedGlyph};
 
 pub struct Glyphs {
 }
@@ -30,6 +30,10 @@ impl Glyphs {
         let mut top: i32 = letter_spacing;
         let mut max_row_height: i32 = 0;
 
+        let mut renderer = Renderer::new(&render_settings.library, &render_settings.face);
+        renderer.set_color(&render_settings.font_color);
+        renderer.set_outline(&render_settings.border_color, render_settings.border_width);
+
         let surface = cairo::ImageSurface::create(cairo::Format::ARgb32, width, height).unwrap();
         let context = cairo::Context::new(&surface);
 
@@ -46,34 +50,16 @@ impl Glyphs {
                 continue
             }
 
-            let codepoint = character as usize;
-            let outline_glyph = RenderedGlyph::new_outline(&render_settings.library, &render_settings.face, codepoint, &render_settings.border_color, render_settings.border_width).unwrap();
-            let inside_glyph = RenderedGlyph::new(&render_settings.library, &render_settings.face, codepoint, &render_settings.font_color).unwrap();
-
-            let outline_top = outline_glyph.origin.1 + outline_glyph.surface.get_height();
-            let inside_top = inside_glyph.origin.1 + inside_glyph.surface.get_height();
-            let glyph_top = cmp::max(outline_top, inside_top);
-
-            let outline_left = outline_glyph.origin.0;
-            let inside_left = inside_glyph.origin.0;
-            let glyph_left = cmp::min(outline_left, inside_left);
-
-            let outline_right = cmp::max(0, outline_glyph.origin.0) + outline_glyph.surface.get_width();
-            let inside_right = cmp::max(0, inside_glyph.origin.0) + inside_glyph.surface.get_width();
-            let glyph_right = cmp::max(outline_right, inside_right);
-
-            let outline_bottom = cmp::max(outline_glyph.surface.get_height(), inside_glyph.surface.get_height());
+            let rendered_glyph = renderer.render(character as usize).unwrap();
+            let glyph_right = rendered_glyph.surface.get_width();
+            let glyph_bottom = rendered_glyph.surface.get_height();
 
             context.set_operator(cairo::Operator::Over);
-            context.set_source_surface(&outline_glyph.surface, (left - glyph_left + outline_left) as f64, (top + glyph_top - outline_top) as f64);
-            context.paint();
-
-            context.set_operator(cairo::Operator::Over);
-            context.set_source_surface(&inside_glyph.surface, (left - glyph_left + inside_left) as f64, (top + glyph_top - inside_top) as f64);
+            context.set_source_surface(&rendered_glyph.surface, left as f64, top as f64);
             context.paint();
 
             left += glyph_right + letter_spacing;
-            max_row_height = cmp::max(max_row_height, outline_bottom);
+            max_row_height = cmp::max(max_row_height, glyph_bottom);
         }
 
         surface
