@@ -4,13 +4,19 @@ use ft::freetype_sys as fts;
 use gdk::{RGBA};
 use std::cmp;
 use std::mem;
-use std::option;
 use std::os::raw::c_long;
 use std::ptr;
 use std::rc::{Rc};
 
 pub struct RenderedGlyph {
+    /// The rendered glyph
     pub surface: ImageSurface,
+    /// Unicode codepoint
+    pub codepoint: usize,
+    // Distance to move the text cursor forward to render the next glyph, in pixels
+    pub advance: (i32, i32),
+    // Offset of top-left corner from baseline, in pixels
+    pub offset: (i32, i32),
 }
 
 pub struct Renderer {
@@ -57,6 +63,9 @@ impl Renderer {
         let glyph = self.face.glyph().get_glyph()?;
 
         let mut bitmaps = Vec::new();
+        let mut glyph_bbox = None;
+        let mut glyph_advance_x = None;
+        let mut glyph_advance_y = None;
 
         if let Some(stroker) = self.outline_stroker.as_ref() {
             let glyph = unsafe {
@@ -69,12 +78,20 @@ impl Renderer {
             let bbox = glyph.get_cbox(fts::FT_GLYPH_BBOX_PIXELS);
             let bitmap_glyph = glyph.to_bitmap(ft::RenderMode::Normal, None)?;
 
+            glyph_bbox = Some(bbox);
+            glyph_advance_x = Some(glyph.advance_x());
+            glyph_advance_y = Some(glyph.advance_y());
+
             bitmaps.push((bitmap_glyph, bbox, &self.outline_color));
         }
 
         {
             let bbox = glyph.get_cbox(fts::FT_GLYPH_BBOX_PIXELS);
             let bitmap_glyph = glyph.to_bitmap(ft::RenderMode::Normal, None)?;
+
+            glyph_bbox = glyph_bbox.or(Some(bbox));
+            glyph_advance_x = glyph_advance_x.or(Some(glyph.advance_x()));
+            glyph_advance_y = glyph_advance_y.or(Some(glyph.advance_y()));
 
             bitmaps.push((bitmap_glyph, bbox, &self.color));
         }
@@ -83,6 +100,9 @@ impl Renderer {
 
         Ok(RenderedGlyph {
             surface: surface,
+            codepoint: codepoint,
+            advance: ((glyph_advance_x.unwrap() >> 16) as i32, (glyph_advance_y.unwrap() >> 16) as i32),
+            offset: (glyph_bbox.unwrap().xMin as i32, glyph_bbox.unwrap().yMax as i32),
         })
     }
 
@@ -152,13 +172,15 @@ impl Renderer {
         out.resize(out_size, 0u8);
 
         for y in 0..height {
-            let offset_y = (y * stride) as usize;
+            let dest_offset_y = (y * stride) as usize;
+            let src_offset_y = y * width * 4;
             for x in 0..width {
-                let offset_x = offset_y + x as usize * 4;
-                out[offset_x + 0] = (buffer[(y * (width * 4) + (x*4) + 0) as usize] * 255.0) as u8;
-                out[offset_x + 1] = (buffer[(y * (width * 4) + (x*4) + 1) as usize] * 255.0) as u8;
-                out[offset_x + 2] = (buffer[(y * (width * 4) + (x*4) + 2) as usize] * 255.0) as u8;
-                out[offset_x + 3] = (buffer[(y * (width * 4) + (x*4) + 3) as usize] * 255.0) as u8;
+                let dest_offset = dest_offset_y + x as usize * 4;
+                let src_offset = (src_offset_y + x * 4) as usize;
+                out[dest_offset + 0] = (buffer[src_offset + 0] * 255.0) as u8;
+                out[dest_offset + 1] = (buffer[src_offset + 1] * 255.0) as u8;
+                out[dest_offset + 2] = (buffer[src_offset + 2] * 255.0) as u8;
+                out[dest_offset + 3] = (buffer[src_offset + 3] * 255.0) as u8;
             }
         }
 

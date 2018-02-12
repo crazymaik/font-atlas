@@ -2,7 +2,6 @@ use cairo::{self, Pattern};
 use gtk::{self, AboutDialog, ApplicationWindow, Builder, ColorButton, DrawingArea, FileChooserAction, FileChooserDialog, FontButton, ImageMenuItem, ResponseType, SpinButton, TextView};
 use gtk::prelude::*;
 use std::cell::RefCell;
-use std::option::{Option};
 use std::path::{Path};
 use std::rc::Rc;
 
@@ -40,12 +39,11 @@ impl MainWindow {
             ]);
             if file_chooser.run() == ResponseType::Ok.into() {
                 let filename = file_chooser.get_filename().expect("Couldn't get filename");
-                let png_filepath = filename.with_extension("png");
                 let render_settings = render_settings.borrow();
                 let width = drawing_area.get_allocated_width();
                 let height = drawing_area.get_allocated_height();
                 let glyphs = Glyphs::new();
-                glyphs.write_to_file(png_filepath, &render_settings, width, height).expect("Succeeds");
+                glyphs.write_to_file(&filename, &render_settings, width, height).expect("Succeeds");
             }
             file_chooser.destroy();
         }));
@@ -145,7 +143,7 @@ impl MainWindow {
             {
                 let render_settings = render_settings.borrow();
                 let glyphs = Glyphs::new();
-                let surface = glyphs.render_to_surface(&render_settings, width, height);
+                let (_,surface) = glyphs.render_to_surface(&render_settings, width, height);
 
                 cr.set_operator(cairo::Operator::Over);
                 cr.set_source_surface(&surface, 0.0, 0.0);
