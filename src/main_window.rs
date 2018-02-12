@@ -90,11 +90,11 @@ impl MainWindow {
             drawing_area.queue_draw();
         }));
 
-        let font_letter_spacing_button: SpinButton = builder.get_object("font_letter_spacing").expect("Couldn't get font letter spacing button");
-        font_letter_spacing_button.set_value(render_settings.borrow().letter_spacing as f64);
-        font_letter_spacing_button.connect_value_changed(clone!(drawing_area, render_settings => move |btn| {
-            let new_spacing = btn.get_value() as isize;
-            (*render_settings.borrow_mut()).letter_spacing = new_spacing;
+        let font_letter_padding_button: SpinButton = builder.get_object("font_letter_padding").expect("Couldn't get font letter padding button");
+        font_letter_padding_button.set_value(render_settings.borrow().letter_padding as f64);
+        font_letter_padding_button.connect_value_changed(clone!(drawing_area, render_settings => move |btn| {
+            let new_padding = btn.get_value() as isize;
+            (*render_settings.borrow_mut()).letter_padding = new_padding;
             drawing_area.queue_draw();
         }));
 
