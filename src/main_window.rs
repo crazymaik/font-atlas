@@ -114,6 +114,14 @@ impl MainWindow {
             drawing_area.queue_draw();
         }));
 
+        let exporter_letter_spacing_spin_button: SpinButton = builder.get_object("exporter_letter_spacing").expect("Couldn't get letter spacing spin button");
+        exporter_letter_spacing_spin_button.set_value(render_settings.borrow().letter_spacing as f64);
+        exporter_letter_spacing_spin_button.connect_value_changed(clone!(drawing_area, render_settings => move |btn| {
+            let new_spacing = btn.get_value() as isize;
+            (*render_settings.borrow_mut()).letter_spacing = new_spacing;
+            drawing_area.queue_draw();
+        }));
+
         drawing_area.connect_draw(clone!(drawing_area, render_settings => move |_, cr| {
             let width = drawing_area.get_allocated_width();
             let height = drawing_area.get_allocated_height();

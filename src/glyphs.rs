@@ -39,9 +39,10 @@ impl Glyphs {
         let mut fnt_file = File::create(&fnt_filepath)?;
 
         let padding = render_settings.letter_padding as u32;
+        let spacing = render_settings.letter_spacing as u32;
         let metrics = render_settings.face.size_metrics().expect("Need metrics");
-        let line_height = metrics.height as u32 / 64;
-        let base = metrics.ascender as i32 / 64;
+        let line_height = metrics.height as u32 / 64 + 2 * padding;
+        let base = metrics.ascender as i32 / 64 + padding as i32;
 
         let font_file = font::FontFile {
             info: font::InfoTag {
@@ -55,7 +56,7 @@ impl Glyphs {
                 smooth: false,
                 aa: false,
                 padding: [padding, padding, padding, padding],
-                spacing: [0, 0],
+                spacing: [spacing, spacing],
                 outline: 0,
             },
             common: font::CommonTag {
@@ -97,8 +98,9 @@ impl Glyphs {
 
     pub fn render_to_surface(&self, render_settings: &RenderSettings, width: i32, height: i32) -> (Vec<GlyphInfo>, cairo::ImageSurface) {
         let letter_padding = render_settings.letter_padding as i32;
-        let mut left: i32 = letter_padding;
-        let mut top: i32 = letter_padding;
+        let letter_spacing = render_settings.letter_spacing as i32;
+        let mut left: i32 = 0;
+        let mut top: i32 = 0;
         let mut max_row_height: i32 = 0;
 
         let mut renderer = Renderer::new(&render_settings.library, &render_settings.face);
@@ -117,33 +119,33 @@ impl Glyphs {
 
         for character in render_settings.text.chars() {
             if character == '\n' {
-                top += max_row_height + letter_padding;
-                left = letter_padding;
+                top += max_row_height + letter_spacing;
+                left = 0;
                 max_row_height = 0;
                 continue
             }
 
             let rendered_glyph = renderer.render(character as usize).unwrap();
-            let glyph_right = rendered_glyph.surface.get_width();
-            let glyph_bottom = rendered_glyph.surface.get_height();
+            let glyph_right = rendered_glyph.surface.get_width() as u32 + 2 * letter_padding as u32;
+            let glyph_bottom = rendered_glyph.surface.get_height() as u32 + 2 * letter_padding as u32;
 
             info.push(GlyphInfo {
                 codepoint: rendered_glyph.codepoint,
                 x: left as u32,
                 y: top as u32,
-                width: rendered_glyph.surface.get_width() as u32,
-                height: rendered_glyph.surface.get_height() as u32,
+                width: glyph_right,
+                height: glyph_bottom,
                 xoffset: rendered_glyph.offset.0,
                 yoffset: rendered_glyph.offset.1,
-                xadvance: rendered_glyph.advance.0,
+                xadvance: rendered_glyph.advance.0 + 2 * letter_padding,
             });
 
             context.set_operator(cairo::Operator::Over);
-            context.set_source_surface(&rendered_glyph.surface, left as f64, top as f64);
+            context.set_source_surface(&rendered_glyph.surface, (left + letter_padding) as f64, (top + letter_padding) as f64);
             context.paint();
 
-            left += glyph_right + letter_padding;
-            max_row_height = cmp::max(max_row_height, glyph_bottom);
+            left += glyph_right as i32 + letter_spacing;
+            max_row_height = cmp::max(max_row_height, glyph_bottom as i32);
         }
 
         (info, surface)
