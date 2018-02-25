@@ -1,6 +1,7 @@
 extern crate cairo;
 extern crate freetype as ft;
 extern crate gdk;
+extern crate glib;
 extern crate gtk;
 
 mod font;
@@ -16,7 +17,12 @@ use std::rc::Rc;
 use render_settings::{RenderSettings};
 use main_window::{MainWindow};
 
+static APP_NAME: &'static str = "font-atlas";
+
 fn main() {
+    glib::set_prgname(Some(APP_NAME));
+    glib::set_application_name(APP_NAME);
+
     if gtk::init().is_err() {
         println!("Failed to initialize GTK.");
         return;
